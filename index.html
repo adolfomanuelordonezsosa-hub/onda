@@ -414,7 +414,14 @@ body.playing .arm{transform:rotate(0deg)}
 .fileitem{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:4px;align-items:center;padding:6px 4px;border-bottom:1px solid var(--ln);font-size:14px}
 
 /* ====== Reproductor de YouTube (canción completa) ====== */
-#yt{position:fixed;inset:0;z-index:47;background:linear-gradient(180deg,color-mix(in srgb,var(--ac) 35%,#000) 0%,#0b0b0e 60%);display:flex;flex-direction:column;transform:translateY(100%);transition:transform .38s cubic-bezier(.2,.8,.2,1)}
+#yt{position:fixed;inset:0;z-index:47;background:linear-gradient(180deg,var(--dyn) 0%,#121318 75%);display:flex;flex-direction:column;transform:translateY(100%);transition:transform .38s cubic-bezier(.2,.8,.2,1),--dyn .9s ease}
+#yt::before{content:"";position:absolute;inset:0;background-image:var(--ytart);background-size:cover;background-position:center;filter:blur(60px) saturate(1.4);opacity:.35;pointer-events:none}
+.yt-in{position:relative}
+.yt-lyr{background:var(--dyn);border-radius:16px;padding:16px 18px;margin:14px 0;max-height:300px;overflow:auto;box-shadow:0 12px 30px #0006;scroll-behavior:smooth}
+.yt-lyr h4{margin:0 0 10px;font-size:15px}
+.yt-lyr .ll{font-size:21px;margin:0 0 8px;cursor:default}
+details.yt-det summary{cursor:pointer;color:var(--tx2);font-weight:700;font-size:14px;padding:10px 0;list-style:none}
+details.yt-det summary::-webkit-details-marker{display:none}
 #yt.open{transform:none}
 .yt-in{flex:1;overflow:auto;max-width:880px;width:100%;margin:0 auto;padding:calc(12px + var(--safe-t)) 18px calc(24px + var(--safe-b))}
 .yt-frame{position:relative;width:100%;aspect-ratio:16/9;min-height:200px;border-radius:14px;overflow:hidden;background:#000;box-shadow:0 20px 50px #000a;margin:10px 0 14px}
@@ -585,9 +592,10 @@ body.playing .arm{transform:rotate(0deg)}
 
 <aside id="info"><div class="sheet-head"><button class="ib" data-act="closeinfo" data-ic="close"></button><b>Historia de la canción</b><span style="width:36px"></span></div><div id="infoBody"></div></aside>
 <section id="yt" aria-hidden="true"><div class="yt-in">
-  <div class="np-head"><button class="ib" data-act="closeyt" data-ic="down"></button><div class="np-from"><small>Canción completa</small><b>Reproductor oficial de YouTube</b></div><span style="width:36px"></span></div>
+  <div class="np-head"><button class="ib" data-act="closeyt" data-ic="down"></button><div class="np-from"><small>Reproduciendo</small><b id="ytFrom"></b></div><button class="ib" data-act="ytinfo" data-ic="info" title="Historia de la canción"></button></div>
   <div class="yt-frame" id="ytFrame"></div>
-  <div class="np-meta" style="margin-bottom:6px"><div><div class="t1" id="ytTitle" style="font-size:20px"></div><div class="t2" id="ytArtist"></div></div></div>
+  <div class="np-meta" style="margin-bottom:6px"><div style="min-width:0"><div class="t1 marq" id="ytTitle" style="font-size:22px"></div><div class="t2" id="ytArtist" style="font-size:15px"></div></div></div>
+  <div class="yt-lyr" id="ytLyr" hidden></div>
   <div id="ytMore"></div>
 </div></section>
 <div id="menu" hidden></div>
@@ -1355,7 +1363,7 @@ async function openSettings(){
     <label class="chk"><input type="checkbox" name="online" ${online()?'checked':''}> Usar internet (portadas HD, letras, recomendaciones, historia de las canciones y música libre)</label>
     <label class="chk"><input type="checkbox" name="fade" ${S.fade?'checked':''}> Entrada suave del volumen al cambiar de canción</label>
     <label>Nombre de este dispositivo (para Onda Connect)<input name="devname" value="${esc(myName())}" maxlength="24"></label>
-    <label>Clave de YouTube (para escuchar canciones completas)<input name="ytkey" value="${esc(store.get('ytkey',''))}" placeholder="AIza…" autocomplete="off"></label>
+    <label>Clave de YouTube (para escuchar canciones completas)<input name="ytkey" value="${esc(store.get('ytkey',''))}" placeholder="Usando la clave incluida en Onda" autocomplete="off"></label>
     <label>Clave de Jamendo (opcional, para más música libre)<input name="jamendo" value="${esc(store.get('jamendo',''))}" placeholder="client_id de devportal.jamendo.com" autocomplete="off"></label>
     <p class="hint">Sin internet, Onda funciona igual con tu música, portadas y letras guardadas. Con internet usa iTunes y MusicBrainz (portadas y vistas previas), LRCLIB (letras), Wikipedia (historia) e Internet Archive/Jamendo (música libre). Solo se envía el título y artista de la canción.</p>
     <button type="button" class="btn ghost" data-act="findcovers">Buscar portadas que faltan ahora</button>`});
@@ -1521,6 +1529,7 @@ document.addEventListener('click',e=>{
     case'full':e.stopPropagation();playFull(d.k);break;
     case'ytpick':ytEmbed(d.id);break;
     case'closeyt':closeYT();break;
+    case'ytinfo':if(S.ytItem)openInfo({title:S.ytItem.title,artist:S.ytItem.artist,album:S.ytItem.album,net:S.ytItem});break;
     case'playgroup':{e.stopPropagation();let ids;
       if(d.t==='playlist')ids=(S.pls.get(d.k)?.ids||[]).filter(id=>S.tracks.has(id));
       else ids=sortTracks([...S.tracks.values()].filter(t=>d.t==='album'?albumKey(t)===d.k:t.artist===d.k),d.t==='album'?'track':'album').map(t=>t.id);
@@ -1828,9 +1837,11 @@ async function fillArtistNet(name){
 /* ---- Canción completa con el reproductor oficial de YouTube ---- */
 function toastAction(msg,label,fn){const t=$('#toast');t.innerHTML=`${esc(msg)} <button style="margin-left:8px;font-weight:800;text-decoration:underline">${esc(label)}</button>`;t.hidden=false;
   const b=t.querySelector('button');b.onclick=()=>{t.hidden=true;fn()};clearTimeout(toast._t);toast._t=setTimeout(()=>t.hidden=true,6000)}
+const DEFAULT_YT_KEY='AIzaSyC6WjAxsh_fZ9zna03Y1A05HMi8Imjqb9c';
+const ytKey=()=>store.get('ytkey','')||DEFAULT_YT_KEY;
 const ytCache=new Map();
 async function ytSearch(q){
-  const key=store.get('ytkey','');if(!key)return{nokey:true};
+  const key=ytKey();if(!key)return{nokey:true};
   if(ytCache.has(q))return ytCache.get(q);
   const r=await fetchJSON('https://www.googleapis.com/youtube/v3/search?'+new URLSearchParams({part:'snippet',type:'video',videoEmbeddable:'true',videoCategoryId:'10',maxResults:'6',q,key}));
   if(!r||r.__err)return{err:true};
@@ -1842,6 +1853,34 @@ function ytEmbed(id){
   const origin=location.protocol.startsWith('http')?location.origin:'';
   $('#ytFrame').innerHTML=`<iframe src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(id)}?autoplay=1&playsinline=1&rel=0&enablejsapi=1${origin?'&origin='+encodeURIComponent(origin):''}" title="Reproductor de YouTube" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>`;
   $$('#ytMore .yt-alt').forEach(b=>b.classList.toggle('on',b.dataset.id===id));
+  const f=$('#ytFrame iframe');S.ytTime=0;S.ytAt=performance.now();S.ytPlaying=false;
+  f.addEventListener('load',()=>{let n=0;const hi=setInterval(()=>{try{f.contentWindow.postMessage(JSON.stringify({event:'listening',id:1,channel:'widget'}),'*')}catch{}if(++n>8)clearInterval(hi)},400)});
+  if(!S.ytRaf)S.ytRaf=requestAnimationFrame(ytTick);
+}
+/* Letra sincronizada con el video (el reproductor avisa en qué segundo va) */
+addEventListener('message',e=>{
+  if(!/youtube(-nocookie)?\.com$/.test((e.origin||'').replace(/^https?:\/\//,'').replace(/^www\./,'')))return;
+  let d;try{d=typeof e.data==='string'?JSON.parse(e.data):e.data}catch{return}
+  if(!d||!d.info)return;
+  if(typeof d.info.currentTime==='number'){S.ytTime=d.info.currentTime;S.ytAt=performance.now()}
+  if(typeof d.info.playerState==='number')S.ytPlaying=d.info.playerState===1;
+  if(d.event==='onStateChange'&&typeof d.info==='number')S.ytPlaying=d.info===1;
+});
+function ytNow(){return(S.ytTime||0)+(S.ytPlaying?(performance.now()-S.ytAt)/1000:0)}
+function ytTick(){
+  if(!S.ytOpen){S.ytRaf=0;return}
+  const L=S.ytLyr&&S.ytLyr.synced;
+  if(L){const now=ytNow()+.2;let lo=0,hi=L.length-1,idx=-1;while(lo<=hi){const m=(lo+hi)>>1;if(L[m].t<=now){idx=m;lo=m+1}else hi=m-1}
+    if(idx!==S.ytIdx){S.ytIdx=idx;const box=$('#ytLyr'),ps=box.querySelectorAll('.ll');ps.forEach((p,i)=>{p.classList.toggle('past',i<idx);p.classList.toggle('cur',i===idx)});
+      const el=ps[Math.max(0,idx)];if(el)box.scrollTop=el.offsetTop-box.clientHeight*.35}}
+  S.ytRaf=requestAnimationFrame(ytTick);
+}
+async function ytLoadLyrics(x){
+  const key=x.key;const box=$('#ytLyr');
+  const res=await findLyricsOnline({title:x.title,artist:x.artist,album:x.album||'',duration:x.dur||0});
+  if(!S.ytItem||S.ytItem.key!==key||!res||res==='err'||(!res.synced&&!res.plain))return;
+  S.ytLyr=res;S.ytIdx=-2;box.hidden=false;
+  box.innerHTML='<h4>Letra'+(res.synced?'':' <small style="color:#ffffffb0;font-weight:600">(sin sincronizar)</small>')+'</h4>'+(res.synced?res.synced.map(l=>`<p class="ll">${esc(l.s)||'♪'}</p>`).join(''):res.plain.split('\n').map(l=>`<p class="ll past">${esc(l)||'&nbsp;'}</p>`).join(''));
 }
 function ytCmd(func){const f=$('#ytFrame iframe');try{f&&f.contentWindow.postMessage(JSON.stringify({event:'command',func,args:[]}),'*')}catch{}}
 async function playFull(k){
@@ -1849,18 +1888,23 @@ async function playFull(k){
   if(!audio.paused)audio.pause();if(!pv.paused)pv.pause();
   const q=`${x.artist} ${cleanTitle(x.title)}`.trim();
   const ytUrl='https://www.youtube.com/results?search_query='+encodeURIComponent(q);
-  if(!store.get('ytkey','')){
+  if(!ytKey()){
     modal({title:'Escuchar canciones completas',ok:'',html:`<p class="hint">Onda pone la canción completa con el <b>reproductor oficial de YouTube</b> aquí mismo. Para buscar el video necesita una <b>clave gratis de YouTube</b> (se saca una sola vez, tarda 3 minutos):</p>
       <ol style="font-size:14px"><li>Entra a <b>console.cloud.google.com</b> con tu cuenta de Google y crea un proyecto (“Onda”).</li><li>Menú → <b>APIs y servicios</b> → <b>Biblioteca</b> → busca <b>YouTube Data API v3</b> → <b>Habilitar</b>.</li><li><b>Credenciales</b> → <b>Crear credenciales</b> → <b>Clave de API</b>. Cópiala.</li><li>En Onda: <b>Ajustes</b> → pégala en “Clave de YouTube”.</li></ol>
       <div class="linkbtns"><a href="${esc(ytUrl)}" target="_blank" rel="noopener">Mientras tanto, abrir en YouTube</a></div>`});
     return;
   }
-  $('#ytTitle').textContent=x.title;$('#ytArtist').textContent=x.artist;
+  marquee($('#ytTitle'),x.title);$('#ytArtist').textContent=x.artist;$('#ytFrom').textContent=x.album||x.artist;
+  S.ytItem=x;S.ytLyr=null;S.ytIdx=-2;$('#ytLyr').hidden=true;
+  const fake={album:x.album||x.title,artist:x.artist,coverUrl:x.hd||x.art||null,id:'yt:'+x.key};
+  $('#yt').style.setProperty('--ytart',x.art?`url("${x.hd||x.art}")`:'none');
+  getColor(fake).then(c=>$('#yt').style.setProperty('--dyn',c||`hsl(${hue(x.album+x.artist)} 42% 30%)`));
+  ytLoadLyrics(x);
   $('#ytFrame').innerHTML='<div class="yt-msg">Buscando la canción…</div>';$('#ytMore').innerHTML='';
   $('#yt').classList.add('open');$('#yt').setAttribute('aria-hidden','false');S.ytOpen=true;
   const res=await ytSearch(q+' audio');
   if(res.err||res.nokey||!res.length){$('#ytFrame').innerHTML=`<div class="yt-msg">${res.err?(res.msg?esc(res.msg):'No se pudo conectar con YouTube. Revisa tu internet o tu clave en Ajustes.'):'No encontré esta canción en YouTube.'}<div class="linkbtns" style="justify-content:center"><a href="${esc(ytUrl)}" target="_blank" rel="noopener">Abrir en YouTube</a></div></div>`;return}
-  $('#ytMore').innerHTML=`<div class="shelf-h" style="margin-top:8px"><h2 style="font-size:17px">¿No es la correcta? Elige otra</h2></div>${res.map(v=>`<button class="yt-alt" data-act="ytpick" data-id="${esc(v.id)}"><img src="${esc(v.thumb||'')}" alt=""><div style="min-width:0"><div class="t1" style="white-space:normal;font-size:14px">${esc(v.title)}</div><div class="t2">${esc(v.channel)}</div></div></button>`).join('')}
+  $('#ytMore').innerHTML=`<details class="yt-det"><summary>¿No es la versión correcta? Elige otra ▾</summary>${res.map(v=>`<button class="yt-alt" data-act="ytpick" data-id="${esc(v.id)}"><img src="${esc(v.thumb||'')}" alt=""><div style="min-width:0"><div class="t1" style="white-space:normal;font-size:14px">${esc(v.title)}</div><div class="t2">${esc(v.channel)}</div></div></button>`).join('')}</details>
     <p class="note">Se reproduce con el reproductor oficial de YouTube (YouTube puede mostrar sus propios anuncios). Por las reglas de YouTube se pausa si sales de la app y no se puede descargar.</p>
     <div class="linkbtns"><a href="${esc(ytUrl)}" target="_blank" rel="noopener">Abrir en YouTube</a></div>`;
   ytEmbed(res[0].id);

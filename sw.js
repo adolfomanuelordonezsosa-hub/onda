@@ -1,5 +1,5 @@
 // Onda — service worker: permite abrir la app sin internet.
-const CACHE = 'onda-v4';
+const CACHE = 'onda-v5';
 const FILES = ['./', './index.html', './manifest.json', './icon.svg', './icon-192.png', './icon-512.png', './icon-maskable-512.png'];
 
 self.addEventListener('install', e => {
