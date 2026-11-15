@@ -1,0 +1,46 @@
+{
+  "name": "onda",
+  "productName": "Onda",
+  "version": "1.0.0",
+  "description": "Onda — reproductor de música propio, sin anuncios.",
+  "author": "Adolfo Ordóñez",
+  "license": "UNLICENSED",
+  "private": true,
+  "main": "electron/main.js",
+  "scripts": {
+    "prepare-www": "node scripts/prepare-www.js",
+    "start": "node scripts/prepare-www.js && electron .",
+    "build:win": "node scripts/prepare-www.js && electron-builder --win nsis --publish never"
+  },
+  "devDependencies": {
+    "electron": "latest",
+    "electron-builder": "latest"
+  },
+  "build": {
+    "appId": "com.adolfo.onda",
+    "productName": "Onda",
+    "copyright": "Adolfo Ordóñez",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "electron/**",
+      "www/**",
+      "assets/icon.png",
+      "package.json"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "assets/icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Onda",
+      "artifactName": "Onda-Windows-Setup.exe"
+    }
+  }
+}
