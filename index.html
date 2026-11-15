@@ -284,7 +284,8 @@ body{background:radial-gradient(1200px 600px at 80% -10%,color-mix(in srgb,var(-
 .qt b{font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:8px}
 .shelf-h{display:flex;align-items:baseline;justify-content:space-between;margin:26px 0 12px}
 .shelf-h h2{margin:0;font-size:22px;letter-spacing:-.4px}
-.shelf-h small{color:var(--tx2);font-weight:600;cursor:pointer}
+.shelf-h small{color:var(--tx2);font-weight:600;cursor:pointer;text-align:right;max-width:48%;font-size:12.5px}
+.shelf-h{gap:12px}
 .shelf{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(150px,176px);gap:14px;overflow-x:auto;scroll-snap-type:x proximity;padding-bottom:6px;scrollbar-width:thin}
 .shelf>*{scroll-snap-align:start}
 .shelf .card{padding:10px}
@@ -412,6 +413,19 @@ body.playing .arm{transform:rotate(0deg)}
 .pick .cv{width:40px;height:40px}
 .fileitem{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:4px;align-items:center;padding:6px 4px;border-bottom:1px solid var(--ln);font-size:14px}
 
+/* ====== Reproductor de YouTube (canción completa) ====== */
+#yt{position:fixed;inset:0;z-index:47;background:linear-gradient(180deg,color-mix(in srgb,var(--ac) 35%,#000) 0%,#0b0b0e 60%);display:flex;flex-direction:column;transform:translateY(100%);transition:transform .38s cubic-bezier(.2,.8,.2,1)}
+#yt.open{transform:none}
+.yt-in{flex:1;overflow:auto;max-width:880px;width:100%;margin:0 auto;padding:calc(12px + var(--safe-t)) 18px calc(24px + var(--safe-b))}
+.yt-frame{position:relative;width:100%;aspect-ratio:16/9;min-height:200px;border-radius:14px;overflow:hidden;background:#000;box-shadow:0 20px 50px #000a;margin:10px 0 14px}
+.yt-frame iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
+.yt-msg{position:absolute;inset:0;display:grid;place-items:center;color:var(--tx2);text-align:center;padding:20px}
+.yt-alt{display:grid;grid-template-columns:96px minmax(0,1fr);gap:12px;align-items:center;padding:6px;border-radius:8px;cursor:pointer;text-align:left;width:100%}
+.yt-alt:hover,.yt-alt.on{background:#ffffff12}
+.yt-alt img{width:96px;aspect-ratio:16/9;object-fit:cover;border-radius:6px}
+.fullbtn{display:inline-flex;align-items:center;gap:4px;height:30px;padding:0 10px;border-radius:999px;background:var(--tx);color:#000;font-size:12px;font-weight:800;white-space:nowrap}
+.fullbtn svg{width:16px;height:16px}
+.fullbtn:hover{transform:scale(1.04)}
 /* ---------- Mobile ---------- */
 @media (max-width:760px){
   #app{grid-template-columns:1fr;grid-template-rows:1fr auto auto}
@@ -570,6 +584,12 @@ body.playing .arm{transform:rotate(0deg)}
 </aside>
 
 <aside id="info"><div class="sheet-head"><button class="ib" data-act="closeinfo" data-ic="close"></button><b>Historia de la canción</b><span style="width:36px"></span></div><div id="infoBody"></div></aside>
+<section id="yt" aria-hidden="true"><div class="yt-in">
+  <div class="np-head"><button class="ib" data-act="closeyt" data-ic="down"></button><div class="np-from"><small>Canción completa</small><b>Reproductor oficial de YouTube</b></div><span style="width:36px"></span></div>
+  <div class="yt-frame" id="ytFrame"></div>
+  <div class="np-meta" style="margin-bottom:6px"><div><div class="t1" id="ytTitle" style="font-size:20px"></div><div class="t2" id="ytArtist"></div></div></div>
+  <div id="ytMore"></div>
+</div></section>
 <div id="menu" hidden></div>
 <div id="modal" hidden></div>
 <div id="toast" hidden></div>
@@ -1032,7 +1052,7 @@ function recoHTML(){
   if(!S.recos){loadRecos();return`<div class="shelf-h"><h2>Recomendado para ti</h2></div><div class="shelf">${Array.from({length:6},()=>'<div><div class="skel" style="aspect-ratio:1"></div><div class="skel" style="height:12px;margin-top:10px;width:70%"></div></div>').join('')}</div>`}
   if(!S.recos.items.length)return'';
   const why=S.recos.top.length?`Porque escuchas ${esc(S.recos.top.slice(0,2).join(' y '))}`:'Lo más escuchado';
-  return`<div class="shelf-h"><h2>Recomendado para ti</h2><small>${why}</small></div><div class="shelf">${S.recos.items.map(x=>netCardHTML(x)).join('')}</div><p class="note">Vistas previas de 30 segundos del catálogo de iTunes. Toca ⓘ para conocer la historia de la canción.</p>`;
+  return`<div class="shelf-h"><h2>Recomendado para ti</h2><small>${why}</small></div><div class="shelf">${S.recos.items.map(x=>netCardHTML(x)).join('')}</div><p class="note">▶ prueba 30 segundos · <b>Escuchar completa</b> la pone entera con el reproductor oficial de YouTube · ⓘ historia de la canción.</p>`;
 }
 
 /* ---- Buscar ---- */
@@ -1267,6 +1287,7 @@ if(IS_NATIVE&&CAP.Plugins&&CAP.Plugins.App){
     if(!$('#menu').hidden)return closeMenu();
     if(!$('#modal').hidden)return $('#modal').dispatchEvent(new MouseEvent('click'));
     if($('#lyr').classList.contains('open'))return closeLyrics();
+    if(S.ytOpen)return closeYT();
     if($('#info').classList.contains('open'))return $('#info').classList.remove('open');
     if($('#queue').classList.contains('open'))return $('#queue').classList.remove('open');
     if($('#np').classList.contains('open'))return closeNP();
@@ -1334,13 +1355,14 @@ async function openSettings(){
     <label class="chk"><input type="checkbox" name="online" ${online()?'checked':''}> Usar internet (portadas HD, letras, recomendaciones, historia de las canciones y música libre)</label>
     <label class="chk"><input type="checkbox" name="fade" ${S.fade?'checked':''}> Entrada suave del volumen al cambiar de canción</label>
     <label>Nombre de este dispositivo (para Onda Connect)<input name="devname" value="${esc(myName())}" maxlength="24"></label>
+    <label>Clave de YouTube (para escuchar canciones completas)<input name="ytkey" value="${esc(store.get('ytkey',''))}" placeholder="AIza…" autocomplete="off"></label>
     <label>Clave de Jamendo (opcional, para más música libre)<input name="jamendo" value="${esc(store.get('jamendo',''))}" placeholder="client_id de devportal.jamendo.com" autocomplete="off"></label>
     <p class="hint">Sin internet, Onda funciona igual con tu música, portadas y letras guardadas. Con internet usa iTunes y MusicBrainz (portadas y vistas previas), LRCLIB (letras), Wikipedia (historia) e Internet Archive/Jamendo (música libre). Solo se envía el título y artista de la canción.</p>
     <button type="button" class="btn ghost" data-act="findcovers">Buscar portadas que faltan ahora</button>`});
   if(!r)return;
   store.set('theme',r.theme||'auto');applyTheme();
   store.set('online',!!r.online);S.fade=!!r.fade;store.set('fade',S.fade);
-  store.set('devname',(r.devname||'').trim());store.set('jamendo',(r.jamendo||'').trim());netCache.clear();
+  store.set('devname',(r.devname||'').trim());store.set('jamendo',(r.jamendo||'').trim());store.set('ytkey',(r.ytkey||'').trim());ytCache.clear();netCache.clear();
   if(r.online){queueMissingCovers();ensureLyrics(curT());ensureHD(curT())}
   S.recos=null;renderLyrics();render();
 }
@@ -1496,6 +1518,9 @@ document.addEventListener('click',e=>{
     case'connect':openConnect();break;
     case'forgetdev':{const peers=store.get('peers',[]).filter(p=>p.code!==d.code);store.set('peers',peers);const c=CONN.conns.get('onda-'+d.code);if(c)try{c.close()}catch{};CONN.conns.delete('onda-'+d.code);updateConnUI();el.closest('.dev').remove();break}
     case'addtopl':pickSongs(d.id);break;
+    case'full':e.stopPropagation();playFull(d.k);break;
+    case'ytpick':ytEmbed(d.id);break;
+    case'closeyt':closeYT();break;
     case'playgroup':{e.stopPropagation();let ids;
       if(d.t==='playlist')ids=(S.pls.get(d.k)?.ids||[]).filter(id=>S.tracks.has(id));
       else ids=sortTracks([...S.tracks.values()].filter(t=>d.t==='album'?albumKey(t)===d.k:t.artist===d.k),d.t==='album'?'track':'album').map(t=>t.id);
@@ -1552,7 +1577,7 @@ document.addEventListener('keydown',e=>{
   else if(e.code==='ArrowLeft'&&e.shiftKey)prev();
   else if(e.code==='ArrowRight'){audio.currentTime=Math.min(audio.duration||0,audio.currentTime+5)}
   else if(e.code==='ArrowLeft'){audio.currentTime=Math.max(0,audio.currentTime-5)}
-  else if(e.key==='Escape'){if($('#info').classList.contains('open'))$('#info').classList.remove('open');else if($('#lyr').classList.contains('open'))closeLyrics();else closeNP();closeMenu();$('#queue').classList.remove('open')}
+  else if(e.key==='Escape'){if(S.ytOpen)closeYT();else if($('#info').classList.contains('open'))$('#info').classList.remove('open');else if($('#lyr').classList.contains('open'))closeLyrics();else closeNP();closeMenu();$('#queue').classList.remove('open')}
   else if(e.key==='l'||e.key==='L'){$('#lyr').classList.contains('open')?closeLyrics():openLyrics()}
   else if(e.key==='/'){e.preventDefault();$('#q').focus()}
 });
@@ -1643,7 +1668,7 @@ function netSearchHTML(){
   if(!res){clearTimeout(netT);netT=setTimeout(()=>runNetSearch(q),450);return`<div class="shelf-h"><h2>En internet</h2></div><div class="skel" style="height:60px;margin-bottom:8px"></div><div class="skel" style="height:60px"></div>`}
   let h='';
   if(res.err)return`<p class="note" style="margin-top:22px">No hay conexión a internet: solo se muestran resultados de tu biblioteca.</p>`;
-  if(res.it.length)h+=`<div class="shelf-h"><h2>Canciones del mundo</h2><small>Vista previa de 30 s</small></div><div class="list">${res.it.map(netRowHTML).join('')}</div>`;
+  if(res.it.length)h+=`<div class="shelf-h"><h2>Canciones del mundo</h2><small>Prueba 30 s o escúchala completa</small></div><div class="list">${res.it.map(netRowHTML).join('')}</div>`;
   h+=`<div class="shelf-h"><h2>Música libre para descargar</h2><small>Gratis y legal</small></div>`;
   h+=res.free.length?`<div class="list">${res.free.map(netRowHTML).join('')}</div>`:`<p class="note">No encontré música con licencia libre para “${esc(q)}”.</p>`;
   h+=`<p class="note">La música libre viene de Internet Archive${store.get('jamendo','')?' y Jamendo':''} (dominio público o Creative Commons) y se guarda en tu biblioteca para escucharla sin internet.</p>`;
@@ -1675,19 +1700,21 @@ function netRowHTML(x){
   const free=x.kind!=='itunes';
   return`<div class="netrow"><img class="cv" src="${esc(x.art||'')}" alt="" loading="lazy" onerror="this.removeAttribute('src');this.classList.add('ph')">
     <div style="min-width:0"><div class="t1">${esc(x.title)}</div><div class="t2">${free?'<span class="badge free">LIBRE</span>':'<span class="badge">30 s</span>'}${esc(x.artist)}${x.year?' · '+esc(x.year):''}</div></div>
-    <div class="acts"><button class="ib" data-act="pv" data-k="${esc(x.key)}" title="${free?'Escuchar':'Vista previa'}">${ic(pvKey===x.key&&!pv.paused?'pause':'play')}</button>
+    <div class="acts"><button class="ib" data-act="pv" data-k="${esc(x.key)}" title="${free?'Escuchar':'Probar 30 s'}">${ic(pvKey===x.key&&!pv.paused?'pause':'play')}</button>
+    ${free?'':`<button class="fullbtn" data-act="full" data-k="${esc(x.key)}" title="Escuchar la canción completa">${ic('play')}Completa</button>`}
     ${free?`<button class="ib" data-act="dl" data-k="${esc(x.key)}" title="Descargar a tu biblioteca">${ic('dl')}</button>`:''}
     <button class="ib" data-act="netinfo" data-k="${esc(x.key)}" title="Historia de la canción">${ic('info')}</button></div></div>`;
 }
 function netCardHTML(x){
   return`<div class="card netcard" style="cursor:default"><div class="cvw"><img class="cv md" src="${esc(x.art||'')}" alt="" loading="lazy" onerror="this.removeAttribute('src');this.classList.add('ph')"><span class="fab" style="opacity:1;transform:none;width:42px;height:42px" data-act="pv" data-k="${esc(x.key)}">${ic(pvKey===x.key&&!pv.paused?'pause':'play')}</span></div>
-  <div class="t1" style="margin-top:10px">${esc(x.title)}</div><div class="t2" style="display:flex;align-items:center;justify-content:space-between;gap:6px"><span style="overflow:hidden;text-overflow:ellipsis">${esc(x.artist)}</span><button class="ib" style="width:28px;height:28px" data-act="netinfo" data-k="${esc(x.key)}">${ic('info')}</button></div></div>`;
+  <div class="t1" style="margin-top:10px">${esc(x.title)}</div><div class="t2" style="display:flex;align-items:center;justify-content:space-between;gap:6px"><span style="overflow:hidden;text-overflow:ellipsis">${esc(x.artist)}</span><button class="ib" style="width:28px;height:28px" data-act="netinfo" data-k="${esc(x.key)}">${ic('info')}</button></div>
+  <button class="fullbtn" style="margin-top:8px" data-act="full" data-k="${esc(x.key)}">${ic('play')}Escuchar completa</button></div>`;
 }
 
 /* ---- Vista previa (no toca tu cola) ---- */
 const pv=new Audio();pv.preload='none';let pvKey=null;
 function pvButtons(){$$('[data-act=pv]').forEach(b=>{const on=b.dataset.k===pvKey&&!pv.paused;b.innerHTML=ic(on?'pause':'play')})}
-pv.addEventListener('play',pvButtons);pv.addEventListener('pause',pvButtons);pv.addEventListener('ended',()=>{pvKey=null;pvButtons()});
+pv.addEventListener('play',pvButtons);pv.addEventListener('pause',pvButtons);pv.addEventListener('ended',()=>{const x=S.netItems.get(pvKey);pvKey=null;pvButtons();if(x&&x.kind==='itunes')toastAction(`¿Te gustó “${x.title}”?`,'Escuchar completa',()=>playFull(x.key))});
 audio.addEventListener('play',()=>{if(!pv.paused)pv.pause()});
 async function playPreview(k){
   const x=S.netItems.get(k);if(!x)return;
@@ -1696,7 +1723,7 @@ async function playPreview(k){
   if(!x.preview){toast('Esta canción no tiene vista previa');return}
   if(!audio.paused)audio.pause();
   pv.src=x.preview;pvKey=k;pv.play().catch(()=>toast('No se pudo reproducir la vista previa'));
-  if(x.kind==='itunes')toast(`Vista previa: ${x.title}`,1600);
+  if(x.kind==='itunes')toast(`Probando 30 s de “${x.title}” · toca “Completa” para oírla entera`,2600);
 }
 
 /* ---- Descargas de música libre ---- */
@@ -1765,7 +1792,7 @@ async function openInfo(t){
     an?itunesArtistSongs(an,30):Promise.resolve([])
   ]);
   if(S.infoKey!==key)return;
-  const it=t.net&&t.net.kind==='itunes'?t.net:(match&&!match.__err?mapItunes(match):null);
+  const it=t.net&&t.net.kind==='itunes'?t.net:(match&&!match.__err?mapItunes(match):null);if(it)S.netItems.set(it.key,it);
   if(it){const f=$('#iFacts');const extra=[it.year&&`Año ${it.year}`,it.genre,it.album&&!knownAlbum(t)&&it.album].filter(Boolean);f.insertAdjacentHTML('afterbegin',extra.map(x=>`<span>${esc(x)}</span>`).join(''))}
   const sw=songWiki&&norm(songWiki.title).includes(norm(cleanTitle(t.title)).slice(0,10))?songWiki:null;
   const moreList=Array.isArray(more)?more.filter(x=>x.previewUrl).slice(0,15).map(mapItunes):[];
@@ -1778,7 +1805,8 @@ async function openInfo(t){
   if(aw)h+=`<div class="isec"><h4>Quién la creó</h4><div class="artist-pic">${aw.thumbnail?.source?`<img src="${esc(aw.thumbnail.source)}" alt="">`:''}<div><b>${esc(aw.title)}</b><div class="t2">${esc(aw.description||'')}</div></div></div><p>${esc(aw.extract)}</p>
       <div class="linkbtns">${S.tracks.size&&[...S.tracks.values()].some(x=>x.artist===an)?`<a href="#" data-act="infoartist" data-k="${esc(an)}">Ver en tu biblioteca</a>`:''}<a href="${esc(aw.content_urls?.desktop?.page||'#')}" target="_blank" rel="noopener">Wikipedia</a></div></div>`;
   if(moreList.length)h+=`<div class="isec"><h4>Más de ${esc(an)}</h4><div class="list" style="margin:0 -8px">${moreList.map(x=>netRowHTML(x).replace('<div class="t2">',`<div class="t2">${have.has(norm(x.title))?'<span class="badge free">EN TU BIBLIOTECA</span>':''}`)).join('')}</div></div>`;
-  h+=`<div class="isec"><h4>Escúchala completa</h4><div class="linkbtns"><a href="${esc(yt)}" target="_blank" rel="noopener">Abrir en YouTube</a>${it?.page?`<a href="${esc(it.page)}" target="_blank" rel="noopener">Apple Music</a>`:''}${t.page?`<a href="${esc(t.page)}" target="_blank" rel="noopener">Página original</a>`:''}</div>${t.license?`<p style="margin-top:10px;font-size:12px">Licencia: ${esc(t.license)}</p>`:''}</div>`;
+  const fk=it?it.key:'q:'+norm(an+' '+t.title);if(!it)S.netItems.set(fk,{kind:'query',key:fk,title:cleanTitle(t.title),artist:an,album:t.album||''});
+  h+=`<div class="isec"><h4>Escúchala completa</h4>${local?'':`<button class="fullbtn" style="height:36px;padding:0 16px;font-size:13px" data-act="full" data-k="${esc(fk)}">${ic('play')}Escuchar completa aquí</button>`}<div class="linkbtns"><a href="${esc(yt)}" target="_blank" rel="noopener">Abrir en YouTube</a>${it?.page?`<a href="${esc(it.page)}" target="_blank" rel="noopener">Apple Music</a>`:''}${t.page?`<a href="${esc(t.page)}" target="_blank" rel="noopener">Página original</a>`:''}</div>${t.license?`<p style="margin-top:10px;font-size:12px">Licencia: ${esc(t.license)}</p>`:''}</div>`;
   $('#iOnline').innerHTML=h;
 }
 async function fillArtistNet(name){
@@ -1790,12 +1818,56 @@ async function fillArtistNet(name){
   const list=Array.isArray(more)?more.filter(x=>x.previewUrl&&!have.has(norm(x.trackName))).slice(0,10).map(mapItunes):[];
   list.forEach(x=>S.netItems.set(x.key,x));
   let h='';
-  if(list.length)h+=`<div class="shelf-h"><h2>Más de ${esc(name)} en internet</h2><small>Vista previa de 30 s</small></div><div class="list">${list.map(netRowHTML).join('')}</div>`;
+  if(list.length)h+=`<div class="shelf-h"><h2>Más de ${esc(name)} en internet</h2><small>Prueba 30 s o escúchala completa</small></div><div class="list">${list.map(netRowHTML).join('')}</div>`;
   if(aw)h+=`<div class="shelf-h"><h2>Acerca de</h2></div><div class="isec" style="display:flex;gap:16px;align-items:flex-start">${aw.thumbnail?.source?`<img src="${esc(aw.thumbnail.source)}" style="width:110px;height:110px;border-radius:12px;object-fit:cover" alt="">`:''}<div><p>${esc(aw.extract)}</p><div class="linkbtns"><a href="${esc(aw.content_urls?.desktop?.page||'#')}" target="_blank" rel="noopener">Leer más en Wikipedia</a></div></div></div>`;
   b.innerHTML=h;
   const pic=S.artistPics.get(name);const hero=$('#content .hero .cv');
   if(pic&&hero&&hero.getAttribute('src')!==pic){hero.outerHTML=`<img class="cv" src="${esc(pic)}" style="border-radius:50%" alt="">`}
 }
+
+/* ---- Canción completa con el reproductor oficial de YouTube ---- */
+function toastAction(msg,label,fn){const t=$('#toast');t.innerHTML=`${esc(msg)} <button style="margin-left:8px;font-weight:800;text-decoration:underline">${esc(label)}</button>`;t.hidden=false;
+  const b=t.querySelector('button');b.onclick=()=>{t.hidden=true;fn()};clearTimeout(toast._t);toast._t=setTimeout(()=>t.hidden=true,6000)}
+const ytCache=new Map();
+async function ytSearch(q){
+  const key=store.get('ytkey','');if(!key)return{nokey:true};
+  if(ytCache.has(q))return ytCache.get(q);
+  const r=await fetchJSON('https://www.googleapis.com/youtube/v3/search?'+new URLSearchParams({part:'snippet',type:'video',videoEmbeddable:'true',videoCategoryId:'10',maxResults:'6',q,key}));
+  if(!r||r.__err)return{err:true};
+  if(r.error)return{err:true,msg:r.error.message};
+  const out=(r.items||[]).map(v=>({id:v.id.videoId,title:v.snippet.title.replace(/&amp;/g,'&').replace(/&quot;/g,'"').replace(/&#39;/g,"'"),channel:v.snippet.channelTitle,thumb:v.snippet.thumbnails?.medium?.url||v.snippet.thumbnails?.default?.url}));
+  ytCache.set(q,out);return out;
+}
+function ytEmbed(id){
+  const origin=location.protocol.startsWith('http')?location.origin:'';
+  $('#ytFrame').innerHTML=`<iframe src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(id)}?autoplay=1&playsinline=1&rel=0&enablejsapi=1${origin?'&origin='+encodeURIComponent(origin):''}" title="Reproductor de YouTube" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>`;
+  $$('#ytMore .yt-alt').forEach(b=>b.classList.toggle('on',b.dataset.id===id));
+}
+function ytCmd(func){const f=$('#ytFrame iframe');try{f&&f.contentWindow.postMessage(JSON.stringify({event:'command',func,args:[]}),'*')}catch{}}
+async function playFull(k){
+  const x=S.netItems.get(k);if(!x)return;
+  if(!audio.paused)audio.pause();if(!pv.paused)pv.pause();
+  const q=`${x.artist} ${cleanTitle(x.title)}`.trim();
+  const ytUrl='https://www.youtube.com/results?search_query='+encodeURIComponent(q);
+  if(!store.get('ytkey','')){
+    modal({title:'Escuchar canciones completas',ok:'',html:`<p class="hint">Onda pone la canción completa con el <b>reproductor oficial de YouTube</b> aquí mismo. Para buscar el video necesita una <b>clave gratis de YouTube</b> (se saca una sola vez, tarda 3 minutos):</p>
+      <ol style="font-size:14px"><li>Entra a <b>console.cloud.google.com</b> con tu cuenta de Google y crea un proyecto (“Onda”).</li><li>Menú → <b>APIs y servicios</b> → <b>Biblioteca</b> → busca <b>YouTube Data API v3</b> → <b>Habilitar</b>.</li><li><b>Credenciales</b> → <b>Crear credenciales</b> → <b>Clave de API</b>. Cópiala.</li><li>En Onda: <b>Ajustes</b> → pégala en “Clave de YouTube”.</li></ol>
+      <div class="linkbtns"><a href="${esc(ytUrl)}" target="_blank" rel="noopener">Mientras tanto, abrir en YouTube</a></div>`});
+    return;
+  }
+  $('#ytTitle').textContent=x.title;$('#ytArtist').textContent=x.artist;
+  $('#ytFrame').innerHTML='<div class="yt-msg">Buscando la canción…</div>';$('#ytMore').innerHTML='';
+  $('#yt').classList.add('open');$('#yt').setAttribute('aria-hidden','false');S.ytOpen=true;
+  const res=await ytSearch(q+' audio');
+  if(res.err||res.nokey||!res.length){$('#ytFrame').innerHTML=`<div class="yt-msg">${res.err?(res.msg?esc(res.msg):'No se pudo conectar con YouTube. Revisa tu internet o tu clave en Ajustes.'):'No encontré esta canción en YouTube.'}<div class="linkbtns" style="justify-content:center"><a href="${esc(ytUrl)}" target="_blank" rel="noopener">Abrir en YouTube</a></div></div>`;return}
+  $('#ytMore').innerHTML=`<div class="shelf-h" style="margin-top:8px"><h2 style="font-size:17px">¿No es la correcta? Elige otra</h2></div>${res.map(v=>`<button class="yt-alt" data-act="ytpick" data-id="${esc(v.id)}"><img src="${esc(v.thumb||'')}" alt=""><div style="min-width:0"><div class="t1" style="white-space:normal;font-size:14px">${esc(v.title)}</div><div class="t2">${esc(v.channel)}</div></div></button>`).join('')}
+    <p class="note">Se reproduce con el reproductor oficial de YouTube (YouTube puede mostrar sus propios anuncios). Por las reglas de YouTube se pausa si sales de la app y no se puede descargar.</p>
+    <div class="linkbtns"><a href="${esc(ytUrl)}" target="_blank" rel="noopener">Abrir en YouTube</a></div>`;
+  ytEmbed(res[0].id);
+}
+function closeYT(){ytCmd('pauseVideo');$('#yt').classList.remove('open');$('#yt').setAttribute('aria-hidden','true');S.ytOpen=false;setTimeout(()=>{if(!S.ytOpen)$('#ytFrame').innerHTML=''},400)}
+document.addEventListener('visibilitychange',()=>{if(document.hidden&&S.ytOpen)ytCmd('pauseVideo')});
+audio.addEventListener('play',()=>{if(S.ytOpen)closeYT()});
 
 /* ---- Portada en alta resolución para "Reproduciendo" ---- */
 async function coverWidth(t){if(!t.cover)return 0;if(t.coverW)return t.coverW;try{const b=await createImageBitmap(t.cover);t.coverW=b.width;return b.width}catch{return 0}}

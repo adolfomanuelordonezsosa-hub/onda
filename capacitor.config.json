@@ -1,0 +1,14 @@
+{
+  "appId": "com.adolfo.onda",
+  "appName": "Onda",
+  "webDir": "www",
+  "backgroundColor": "#0d0e12",
+  "android": {
+    "backgroundColor": "#0d0e12",
+    "adjustMarginsForEdgeToEdge": "force"
+  },
+  "server": {
+    "hostname": "com.adolfo.onda",
+    "androidScheme": "https"
+  }
+}
